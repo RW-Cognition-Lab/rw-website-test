@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Gmail PKCE OAuth2 Demo</title>
+</head>
+<body>
+  <h1>Gmail PKCE OAuth2 Demo</h1>
+  <button id="loginBtn">Login with Google (PKCE)</button>
+
+  <pre id="output"></pre>
+
+  <script>
+    // === CONFIG ===
+    const CLIENT_ID = "65568131984-it0plkc8prvqfb0if8n8bed0smuj3sde.apps.googleusercontent.com";
+    const REDIRECT_URI = "https://rwcognitionlabs.com/oauth2callback"; // must match in Google Cloud
+    const SCOPE = "https://mail.google.com/";
+
+    function base64urlencode(buffer) {
+      return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function generateCodeVerifierAndChallenge() {
+      const array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      const codeVerifier = base64urlencode(array);
+
+      const encoder = new TextEncoder();
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(codeVerifier));
+      const codeChallenge = base64urlencode(digest);
+
+      return { codeVerifier, codeChallenge };
+    }
+
+    function redirectToGoogle(codeChallenge) {
+      const params = new URLSearchParams({
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: "code",
+        scope: SCOPE,
+        access_type: "offline", // may still not give refresh_token in browser PKCE
+        prompt: "consent",
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256"
+      });
+      window.location = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    }
+
+    async function exchangeCodeForToken(code, codeVerifier) {
+      const body = new URLSearchParams({
+        client_id: CLIENT_ID,
+        code: code,
+        code_verifier: codeVerifier,
+        redirect_uri: REDIRECT_URI,
+        grant_type: "authorization_code"
+      });
+
+      const resp = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body
+      });
+      return resp.json();
+    }
+
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    async function handleRedirect() {
+      const code = getQueryParam("code");
+      if (!code) return; // No auth code, nothing to do
+
+      const codeVerifier = sessionStorage.getItem("pkce_code_verifier");
+      if (!codeVerifier) {
+        document.getElementById("output").textContent = "Missing code_verifier. Start login again.";
+        return;
+      }
+
+      const tokenData = await exchangeCodeForToken(code, codeVerifier);
+      document.getElementById("output").textContent = JSON.stringify(tokenData, null, 2);
+
+      // Clear the verifier from sessionStorage for safety
+      sessionStorage.removeItem("pkce_code_verifier");
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const { codeVerifier, codeChallenge } = await generateCodeVerifierAndChallenge();
+      sessionStorage.setItem("pkce_code_verifier", codeVerifier);
+      redirectToGoogle(codeChallenge);
+    });
+
+    // Handle redirect if code= is present
+    handleRedirect();
+  </script>
+</body>
+</html>
