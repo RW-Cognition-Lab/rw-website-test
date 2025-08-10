@@ -6,14 +6,14 @@
 </head>
 <body>
   <h1>Gmail PKCE OAuth2 Demo</h1>
-  <button id="loginBtn">Login with Google (PKCE)</button>
+  <button id="loginBtn">Login with Google (PKCE Doh)</button>
 
   <pre id="output"></pre>
 
   <script>
     // === CONFIG ===
     const CLIENT_ID = "65568131984-it0plkc8prvqfb0if8n8bed0smuj3sde.apps.googleusercontent.com";
-    const REDIRECT_URI = "https://rwcognitionlabs.com/oauth2callback"; // must match in Google Cloud
+    const REDIRECT_URI = "https://rwcognitionlabs.com/index.html"; // must match in Google Cloud
     const SCOPE = "https://mail.google.com/";
 
     function base64urlencode(buffer) {
